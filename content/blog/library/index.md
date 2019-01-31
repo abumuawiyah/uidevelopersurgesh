@@ -1,10 +1,10 @@
 ---
-title: Develop the right Table component
+title: Finding the right pattern for Table component
 date: '2019-01-13'
 ---
 
 ### Table component
-Table component is a component that showed data in tabular-way. 
+Table component is a component that display data in tabular-way. 
 The criteria's of the table component is
 - reusable
 - customizable 
@@ -13,17 +13,16 @@ The criteria's of the table component is
 ### Reusable
 It's very important to create reusable component that strictly follow the rules
 - component have to be isolated
-- component to be free from specificity
+- component to be free from app-specific
 
 #### isolated
-The objective to provide isolation is to ensure component developed didn't override other components
-and it's scope never exposed to the outsider and prevent from be overrided.
+The objective of isolation is to ensure component developed didn't override other components
+and the component scope never exposed to the outsider and prevent it to be overrided.
 
-#### specificity
-Abusing code with specificity always exposing coding into bespoke style. 
-And the JavaScript is poor on supporting bespoke style as it's not strong type language by default.
+#### free from app-specific
+Abusing code with app-specific always exposing coding into conditional way.
 
-Here is simple illustration:
+Here is the simple illustration:
 
 ```js
  if (invoker === 'app1') {
@@ -33,8 +32,11 @@ Here is simple illustration:
  } else if ...
 ```
 
+Every invocation of the component will go thru the pipeline of conditionals. If more apps use the component, more conditionals need to be go thru. Hard to read and hard to maintaining it.
+
+
 ### Customizable
-Often Ui developer choose to develop configurable Ui in order to support customization. I'm one of them. This is sample illustration the idea of configurable Ui:
+Often Ui developer choose to develop configurable Ui in order to support customization. I'm one of them. This is a sample illustration the idea of configurable Ui:
 
 ```js
 const table = new ConfigUi({
@@ -95,13 +97,11 @@ return (
 )
 ```
 
-Everything look good BUT above JSX pattern has one challenge we need to deal with.
-I will cover the challenge and solution after we done with "extendable" part.
+Everything look good BUT above JSX pattern has one challenge that we need to deal with.
+I will cover the challenge and the solution after we done with "extendable" part.
 
 ### Extendable
-In Human JavaScript book, wrote by the author of the phenomenal backbone framework called Ampersand --Henrik Joreteg
-
-Henrik give the best reason to uncoupled component with the app that invoking it:
+In Human JavaScript book, the author give the best reason to uncoupled reusable stuff with the invokers:
 
 > it's very easy to fall into the trap of tightly coupling your application to 
 > that particular client.This makes it much harder to build other clients, 
@@ -111,7 +111,7 @@ Henrik give the best reason to uncoupled component with the app that invoking it
 > we have good reason to believe that the breadth of device types that want 
 > to talk to your app will continue to increase
 
-One way to uncoupled the component with the app is to provide a way for the app to extendable the component. Here is illustration on providing extendable component.
+One way to decoupled the component with the app is to provide a way for the app to extend the component. Here is illustration on providing extendable component.
 
 ```js
 const NewTableComponent = Extend(TableComponent, {
@@ -124,10 +124,10 @@ const NewTableComponent = Extend(TableComponent, {
 })
 ```
 
-As promise, we will go thru on the challenge when we apply configurable pattern on the markup - JSX
-The main challenge is how manage communication between TableComponent and it's nested components.
+As promise, let is go thru the challenge by applying configurable pattern on the markup (JSX).
+The challenge is how to manage communication (passing props & state) between TableComponent and it's nested components.
 
-Let take code as sample:
+Let take the below code as an example:
 
 ```jsx
 <TableComponent striped>
@@ -139,7 +139,7 @@ Let take code as sample:
 </TableComponent>
 ```
 
-Here is requirements:
+Here is the requirements:
 
 - when striped prop added, row:even showed dark background color 
 - while row:odd should light background color
@@ -147,7 +147,7 @@ Here is requirements:
 
 ![w3school table sample](./striped-table.png)
 
-We can easily tackle this by passing the prop "striped" to the TableComponentRow. However it is not always the "easy" thing is the "smart" thing, especially on this case. It's ugly, i must admit it. No, WE must admit it.
+We can easily tackle this by passing the prop "striped" to the TableComponentRow. However it is not always the "easy" thing is the "right" thing, especially on this case. It's ugly, i must admit it. No, WE must admit it.
 
 ```jsx
 <TableComponent striped>
@@ -159,17 +159,122 @@ We can easily tackle this by passing the prop "striped" to the TableComponentRow
 </TableComponent>
 ```
 
-You must think why we are not explicitly add the striped prop in component script instead.
-But remember, in the script the row is table {children} which table doesn't know and care about it.
+Its more ugly when all of the childrens of the Table need the "striped" prop:
+
+```jsx
+<TableComponent striped>
+    <TableComponentRow striped>
+        <TableComponentCell striped>
+            ...
+        </TableComponentCell>
+    </TableComponentRow>
+</TableComponent>
+```
+
+Some cool React developer solve the issue by using Cloning pattern and its not a bad pattern:
 
 ```js
+const childWithProps = React.cloneElement(children, {striped: this.props.striped});
 return (
-    <table>
-        {children}
-    </table>
+    <Table>
+        {childWithProps}
+    </Table>
 )
 ```
 
-Worry not, in the latest React, the team introduce one super-awesome pattern called Context API.
+But what if the Table component have multiple type of childrens - TableRow, THead, TFoot and Caption?
 
---to be continue
+```js
+  const { striped } = this.props;
+  const childArray = React.Children.toArray(children);
+  const childrenWithProps = childArray.map((child, i) => {
+    switch (child.type) {
+      case 'TableRow':
+        return React.cloneElement(child, {
+          striped
+        });
+      case 'THead':
+        return React.cloneElement(child, {
+          striped
+        });
+       case 'TFoot':
+        return React.cloneElement(child, {
+          striped
+        });
+       case 'Caption':
+        return React.cloneElement(child, {
+          striped
+        });
+      default:
+        return child;
+    }
+  });
+```
+
+Well, it is a lots of code. And when we have more props, more code need to be added.
+
+As the title is "Finding the right pattern for Table component", Let is walkthorugh the Context API pattern. 
+
+Context API pattern is the approach to have one Provider with multi-consumers who depends on the Provider to provide them the data. The data can be derived from the props and the state of the Provider.
+
+Here is the sample Provider code:
+
+```jsx
+<Provider value={{dataFromProps, dataFromContext}}>
+    {children}
+</Provider>
+```
+
+And here is the sample Consumer code:
+
+```jsx
+<Consumer>
+    {{(providerContext)}} => (
+        {providerContext.dataFromProps}
+    )
+</Consumer>
+```
+
+Let is rewrite the Table code with Context API pattern:
+
+Start with Table (Provider):
+
+```jsx
+<Table.Provider value={{striped}}>
+    {children}
+</Table.Provider>
+```
+
+And the Table consumers
+
+```jsx
+<Table.Consumer>
+    {{(tableContext)}} => (
+        <TableRow />
+    )
+</Table.Provider>
+```
+
+By wrapping in {{(tableContext)}}, all data that we throw in tableContext is available for the nested components.
+
+THead:
+
+```jsx
+<Table.Consumer>
+    {{(tableContext)}} => (
+        <TableHead />
+    )
+</Table.Provider>
+```
+
+TFoot:
+
+```jsx
+<Table.Consumer>
+    {{(tableContext)}} => (
+        <TableFoot/>
+    )
+</Table.Provider>
+```
+
+Table nested components like TableCell, TableHeaderRow and TableHeaderCell can utilize the Table context. We don't have to worry about developing complex component with multi nested components anymore.
